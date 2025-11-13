@@ -210,4 +210,73 @@ value="<%= item.id %>"	Dynamic from database	1, 2, 3	The value sent to backend w
 
 ---
 
+If you want, I can show you a mini working version (Express + EJS + database array) so you can see exactly how item.id gets created and passed around. Want me to show that? onchange="this.form.submit()" name="deleteItemId" value="<%= item.id %>">
+      <p><%= item.title %></p>
+    </form>
+  </div>
+<% } %>
+
+EJS will loop through each object in listItems.
+
+So:
+
+On the first loop, item.id = 1
+
+On the second loop, item.id = 2
+
+On the third loop, item.id = 3
+
+
+Then it renders plain HTML like this:
+
+<form action="/delete" method="post">
+  <input type="checkbox" onchange="this.form.submit()" name="deleteItemId" value="1">
+  <p>Buy milk</p>
+</form>
+<form action="/delete" method="post">
+  <input type="checkbox" onchange="this.form.submit()" name="deleteItemId" value="2">
+  <p>Clean room</p>
+</form>
+<form action="/delete" method="post">
+  <input type="checkbox" onchange="this.form.submit()" name="deleteItemId" value="3">
+  <p>Study requests module</p>
+</form>
+
+
+---
+
+3️⃣ When you check one checkbox
+
+For example, you tick the second checkbox → the form sends:
+
+deleteItemId = 2
+
+to /delete route via POST.
+
+Then in your backend:
+
+app.post("/delete", async (req, res) => {
+  const id = req.body.deleteItemId;
+  await db.query("DELETE FROM items WHERE id = $1", [id]);
+  res.redirect("/");
+});
+
+So req.body.deleteItemId will equal "2" (the value you put in the checkbox).
+
+
+---
+
+✅ Summary Table
+
+Template Variable	Comes From	Example Value	Purpose
+
+<%= item.id %>	Your database (via listItems)	1, 2, 3	Unique identifier for each item
+<%= item.title %>	Your database (via listItems)	“Buy milk”	The visible text
+name="deleteItemId"	Static HTML attribute	—	The key in req.body
+value="<%= item.id %>"	Dynamic from database	1, 2, 3	The value sent to backend when submitted
+
+
+
+---
+
 If you want, I can show you a mini working version (Express + EJS + database array) so you can see exactly how item.id gets created and passed around. Want me to show that?
