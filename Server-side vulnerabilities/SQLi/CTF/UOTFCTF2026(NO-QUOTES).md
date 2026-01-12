@@ -124,3 +124,6 @@ username=\&password=%29+UNION+SELECT+1,0x7b7b206765745f666c61736865645f6d6573736
 
 **Flag:**
 `uoftctf{w0w_y0u_5UcC355FU1Ly_Esc4p3d_7h3_57R1nG!}`
+
+![Uploading Screenshot 2026-01-11 192547.png…]()
+
