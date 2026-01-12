@@ -156,6 +156,8 @@ print(pass_box)
 
 **Boom. LES FREAKING GO!** 🚀
 <img width="725" height="740" alt="Screenshot 2026-01-12 211540" src="https://github.com/user-attachments/assets/8161f774-8826-4d81-8412-bc6911824346" />
+
+```
 Owh the secomd replace method cannot be use as replace because it is in hex?
 
 YES! That is the secret.
@@ -197,3 +199,9 @@ Outer Layer: Executes because it is SQL command.
 Inner Layer: Does NOT execute because it is Hex Data.
 
 You used the Hex to "smuggle" the code past the execution engine without it running a second time!
+```
+### THE FINAL RESULT ahah
+<img width="1918" height="950" alt="Screenshot 2026-01-12 212325" src="https://github.com/user-attachments/assets/b192cc03-3abf-40c2-a4dc-ca3a56e4da6d" />
+
+<img width="1792" height="687" alt="image" src="https://github.com/user-attachments/assets/52e14ba1-f88f-410a-bc79-e9cb55d137af" />
+
