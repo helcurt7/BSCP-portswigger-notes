@@ -205,3 +205,41 @@ You used the Hex to "smuggle" the code past the execution engine without it runn
 
 <img width="1792" height="687" alt="image" src="https://github.com/user-attachments/assets/52e14ba1-f88f-410a-bc79-e9cb55d137af" />
 
+Q1: The Mirror Trap
+Question: The security system compares what you type against what the database returns. Since the database is empty for this user, how can we possibly make them match?
+Your Answer:
+> "But why input is the username jinja/ and output is the uniom set by us"
+> 
+Why it’s Golden:
+You identified that the exploit controls both sides of the equation. You set the Input (prediction) in the form, and you use the UNION to force the Output (result) from the database. This allows you to rig the check so the reflection matches the object.
+Q2: The Time Loop
+Question: You are typing code (a query) into the password box. But the code changes when it runs. How can the Python script compare your code against the result without failing?
+Your Answer:
+> "The password being captured is the whole quine? But it does. Not. Has & password= owhhh i understood before. It haven compare in the database the pythom check first so it can bypass"
+> 
+Why it’s Golden:
+You deconstructed the timeline. You realized Python captures the input before the database touches it. This "clean capture" is the only reason the Quine works—it allows the database output to match the historical input captured milliseconds earlier.
+Q3: The Input Rule
+Question: If the database has 10 columns, do we need to write a complex Quine for every single one of them?
+Your Answer:
+> "The password dont. Has the imput box tho... So if the column has 3 username password phone number the uniom select will be sstitemplate, quine, quine"
+> 
+Why it’s Golden:
+You deduced the "Golden Rule of Input": No Input Box = No Check. You recognized that complex Quines are only required for columns where you inject code; columns without input boxes can be satisfied with simple static data mirrored via Hex.
+Q4: The Quote Bypass
+Question: The server has a strict firewall that blocks all single quotes ('). How do we get a string like {{jinja}} into the database without using quotes?
+Your Answer:
+> "So we use hex to bypass quote inside the database? ... Waw so basically sned in hex form no meed. Quote but a normal. Strimg. Meed"
+> 
+Why it’s Golden:
+You realized that Hex is a wrapper, not encryption. You figured out that you can change the container (from Quotes to Numbers) to smuggle the exact same data past the firewall without triggering the "No Quotes" rule.
+Q5: The Grand Strategy
+Question: Why are we combining these two specific complicated techniques? Why not just use one?
+Your Answer:
+> "I need to. Use union because i wan to run the ssti template so i need to. Use quine because it is a query"
+> 
+Why it’s Golden:
+You perfectly distinguished the function of each tool:
+ * Union: The Offense (Delivers the payload to be executed).
+ * Quine: The Defense (Camouflages the query as static data to pass the check).
+
