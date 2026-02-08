@@ -83,3 +83,78 @@ actor {
 2. **Public (Mainnet):** `dfx deploy --network ic`. This makes your app **publicly hosted** on the global internet, accessible by anyone via a `.icp0.io` URL.
 
 ---
+
+Here is the concise write-up for your project, focusing on the **Core Data Flow** and the **Essential Commands**. You can copy this directly into your documentation.
+
+---
+
+# **Project Core: Data Passing & Workflow**
+
+## **1. Core Data Passing Mechanism**
+
+The application relies on a **Client-Server architecture** bridged by the Internet Computer's `HttpAgent`.
+
+* **The Bridge:** The frontend imports the backend canister as a JavaScript object using `declarations`.
+* **The Protocol:** Calls are asynchronous (`async/await`) because the frontend must wait for the blockchain consensus.
+* **Security:** In a local environment, the `HttpAgent` fetches the "Root Key" to establish a trusted connection without SSL.
+
+### **A. The READ Flow (Fetching Data)**
+
+**Context:** This runs immediately when the app loads (`useEffect`). It queries the immutable state from the backend.
+
+```javascript
+// 1. IMPORT: The "Bridge" to the backend canister
+import { my_first_app_backend } from 'declarations/my_first_app_backend';
+
+async function updateBalance() {
+  // 2. CONNECT: Fetch Root Key (Only needed for Localhost) to bypass SSL
+  if (process.env.DFX_NETWORK !== "ic") {
+    const agent = new HttpAgent({ host: "http://127.0.0.1:4943" });
+    await agent.fetchRootKey();
+  }
+
+  // 3. QUERY: Ask the blockchain for data (Fast, Read-Only)
+  const currentBalance = await my_first_app_backend.checkBalance();
+  
+  // 4. SYNC: Update React State to refresh the UI
+  setBalance(currentBalance);
+};
+
+```
+
+### **B. The WRITE Flow (Executing Transactions)**
+
+**Context:** This runs when the user submits a form. It changes the state on the blockchain.
+
+```javascript
+async function handleSubmit(amount) {
+  // 1. UPDATE: Send command to Blockchain (Slow, 1-2s for Consensus)
+  // We use 'await' to pause the code until the block is finalized.
+  await my_first_app_backend.topUp(amount);
+
+  // 2. RE-SYNC: The backend state changed, but frontend is stale.
+  // We must manually trigger the READ flow again to see the new balance.
+  await updateBalance(); 
+};
+
+```
+
+---
+
+## **2. Command Reference Cheat Sheet**
+
+Use these commands in your terminal to manage the full-stack lifecycle.
+
+| Goal | Command | Description |
+| --- | --- | --- |
+| **Start Engine** | `dfx start --background --clean` | Starts the local blockchain replica. `--clean` fixes state errors. |
+| **Deploy App** | `dfx deploy` | Compiles Backend (Motoko) & Frontend, generates Declarations, and uploads to the local blockchain. |
+| **Local Dev** | `npm run dev` | Starts the **Vite** server (Port 5173). Use this for quick CSS/JS changes without redeploying backend. |
+| **Build Prod** | `npm run build` | Compiles your React code into static HTML/JS (in `dist/`) so it can be hosted on the Internet Computer. |
+| **Check Wallet** | `dfx canister call my_first_app_backend checkBalance` | Manually checks the backend balance via terminal to verify data integrity. |
+
+---
+
+### **Summary Statement**
+
+> "The application utilizes a **Unidirectional Data Flow**. The React frontend initiates asynchronous calls via the `HttpAgent`, waiting for the Motoko backend to confirm transactions on-chain. State consistency is maintained by triggering a 'Read' query immediately after every 'Write' operation, ensuring the UI always reflects the true ledger state."
