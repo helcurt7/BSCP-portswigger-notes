@@ -1,3 +1,134 @@
+## 🚀 Master Manual: ICP Full-Stack Development & Canister Architecture
+
+**Focus:** Motoko Backend, `dfx.json` Configuration, and React Frontend Integration.
+
+This guide consolidates the "razor-sharp" logic we've discussed. It covers the flow from the CLI configuration to the automated JavaScript bridge, ensuring your "sleeper build" project has a professional, airtight foundation.
+
+---
+
+## 1. The Blueprint: `dfx.json` Configuration
+
+The `dfx.json` file is the "brain" of your project. The `dfx` tool uses this file to understand your architecture. If a canister isn't here, the CLI won't recognize it.
+
+### Adding a Custom Canister (The Workflow)
+
+If you want to add a new backend (e.g., a **Token** canister) alongside your default app, you must manually declare it.
+
+```json
+{
+  "canisters": {
+    "my_app_backend": {
+      "main": "src/my_app_backend/main.mo",
+      "type": "motoko"
+    },
+    "my_app_frontend": {
+      "dependencies": ["my_app_backend"],
+      "source": ["src/my_app_frontend/dist"],
+      "type": "assets"
+    },
+    // 🚩 YOUR NEW CUSTOM CANISTER (Manually Added)
+    "token": {
+      "main": "src/token/main.mo",
+      "type": "motoko"
+    }
+  }
+}
+
+```
+
+---
+
+## 2. The "Empty Shell" Flow (Manual Creation)
+
+While `dfx deploy` is the "all-in-one" command, advanced scenarios (CTFs, DAOs, or hardcoding IDs) require the **Manual Lifecycle**.
+
+### Step-by-Step Commands:
+
+1. **Create the Folder & File:**
+```bash
+mkdir src/token && touch src/token/main.mo
+
+```
+
+
+2. **Create the Shell (Reserve the ID):**
+*This looks at `dfx.json`, finds "token", and creates an identity on the local ledger.*
+```bash
+dfx canister create token
+
+```
+
+
+3. **Get the Canister ID:**
+```bash
+dfx canister id token
+
+```
+
+
+4. **The Manual Lifecycle (Under the Hood):**
+```bash
+dfx build token            # Compiles Motoko to WebAssembly (Wasm)
+dfx canister install token  # Injects Wasm into the empty shell
+
+```
+
+
+
+---
+
+## 3. Deployment Strategy: "Nuke" vs. "Sniper"
+
+Don't waste time rebuilding your entire React frontend when you only changed one line of Motoko.
+
+| Method | Command | Use Case |
+| --- | --- | --- |
+| **The "Nuke"** | `dfx deploy` | First-time setup or full sync to Mainnet. |
+| **The "Sniper"** | `dfx deploy token` | Rapidly testing backend logic; skips the slow frontend build. |
+
+> **Note:** The name used in the terminal **must** match the lowercase key defined in `dfx.json`.
+
+---
+
+## 4. The Bridge: From Motoko to React
+
+This is the most critical realization: **The `dfx` tool ignores your Motoko Actor name.** * **In Motoko:** You might name your actor `actor Token { ... }`.
+
+* **In `dfx.json`:** You named the canister `token`.
+* **In React:** You **must** import using the `dfx.json` name.
+
+### The Automated Declarations
+
+When you run `dfx deploy`, the tool generates a `declarations` folder. This is your **Auto-Generated API Documentation**.
+
+```javascript
+// 🚩 CORRECT: Import using the lowercase name from dfx.json
+import { token } from "../../declarations/token";
+
+async function checkBalance() {
+  // The 'token' object here is the JavaScript bridge to your Motoko backend
+  const balance = await token.getBalance(); 
+  console.log("Balance is:", balance);
+}
+
+```
+
+---
+
+## 5. Summary Checklist for your "Military Order"
+
+1. **Define** the canister in `dfx.json`.
+2. **Create** the corresponding `.mo` file in the `src` folder.
+3. **Deploy** using the "Sniper" method (`dfx deploy <name>`).
+4. **Import** the lowercase generated declaration into your React components.
+
+---
+
+"Steady lah," you've successfully mapped the entire data flow from the CLI config straight into the frontend. You're no longer just "copy-pasting"—you're architecting.
+
+**Would you like me to provide the React integration code for the Plug Wallet now, so we can replace those hardcoded Principal IDs with real-time authentication?**
+
+
 "Wa biang," you are absolutely right, bro. My apologies. I gave you the polished core but left out the massive foundation you had already built. If you are going to use this as your true "Zero to Master" reference manual for your upcoming Hackathons, it needs to be the *complete* bible. No missing chapters, no fragmented notes.
 
 Here is the **Ultimate 2026 Master Manual**, fully consolidated. It combines your entire setup workflow, identity logic, React frontend architecture, advanced DAO concepts, and the updated EOP 2026 Motoko standard into one massive, copy-pasteable document.
