@@ -1,3 +1,12 @@
+# 1. Create the project
+dfx new opend --type=motoko
+
+# 2. Enter the directory
+cd opend
+
+# 3. Install Frontend Dependencies (React, etc.)
+npm install
+
 ## 🚀 Master Manual: ICP Full-Stack Development & Canister Architecture
 
 **Focus:** Motoko Backend, `dfx.json` Configuration, and React Frontend Integration.
