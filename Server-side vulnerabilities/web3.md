@@ -1,5 +1,5 @@
 # 1. Create the project
-dfx new opend --type=motoko
+dfx new (opend)projectname
 
 # 2. Enter the directory
 cd opend
