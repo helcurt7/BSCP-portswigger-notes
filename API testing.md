@@ -56,7 +56,7 @@ Exposed reset function:
 /forgot-password?reset_token=${resetToken}
 ```
 
-### 2. At /forgot-password
+### 2. At /forgot-password #, &, and =
 
 <img width="408" height="298" alt="image" src="https://github.com/user-attachments/assets/633ba1f3-f4da-4abc-bad5-9d618f0fa65b" />
 
