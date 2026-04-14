@@ -1,6 +1,63 @@
 The application is vulnerable to **Mass Assignment** and **Server-Side Parameter Pollution (SSPP)**, allowing unauthorized manipulation of critical API parameters such as product pricing and admin password reset tokens. Improper backend validation and lack of whitelisting enable attackers to escalate privileges or alter sensitive data via JSON structure injection.
 
+Got it. Here is the text and table rendered normally so you can read it straight from the chat interface!
+
+## 🔀 HTTP Parameter Pollution (HPP)
+*Requirement: The application processes multiple parameters with the same name unpredictably, allowing you to override values or bypass filters.*
+
+### 1. The Core URL Characters
+To manipulate parameters, you must control the delimiters:
+* **`&` (Ampersand):** Separates different parameters.
+* **`=` (Equals):** Assigns the value.
+* **`#` (Hash) / `%23`:** Truncates the URL or acts as a comment fragment.
+
+### 2. The Backend Behavior Matrix
+If you send two parameters with the exact same name:
+`GET /users/search?name=peter&name=carlos&publicProfile=true`
+
+How different servers parse the `name` parameter:
+
+| Backend Technology | Which parameter does it read? | Output Result |
+| :--- | :--- | :--- |
+| **PHP** | **Last** parameter only | `carlos` |
+| **Node.js / Express** | **First** parameter only | `peter` |
+| **ASP.NET** | **Combines** both with a comma | `peter,carlos` |
+
+### 3. The Pro Play (How to Exploit)
+
+**Attack Path A: Privilege Escalation (Overriding Context)**
+If an application automatically appends your username to a backend request, you can add a second parameter to override it.
+
+* **The Injection:**
+```http
+POST /update_profile?username=hacker&username=administrator
+```
+
+> *Result:* If the backend is PHP, it ignores `hacker`, reads the last parameter, and updates the `administrator` account instead!
+
+**Attack Path B: WAF Bypass**
+If a Web Application Firewall (WAF) only inspects the *first* parameter, but the backend database processes the *last* parameter (like PHP):
+
+* **The Injection:**
+```http
+GET /search?q=safe_word&q=<script>alert(1)</script>
+```
+
+> *Result:* The WAF checks `q=safe_word`, sees it is harmless, and lets it through. The backend ignores the safe word, reads `q=<script>...`, and executes the payload.
+
+**Attack Path C: Truncating Backend Queries**
+If you suspect the backend is appending unwanted strings to your input (e.g., `&action=view`), you can use URL-encoded characters to break it.
+
+* **The Injection:**
+```http
+GET /profile?user=administrator%23
+```
+> *Result:* The `%23` (`#`) acts as a comment, telling the backend to ignore everything that comes after your payload.
+
+If you are using Burp Suite for the exam, remember James Kettle's **Param Miner** BApp! If you right-click a request, you can select `Guess GET parameters` or `Guess headers`, and it will automatically test for parameter pollution in the background while you keep working.
+
 ---
+
 
 # Proof-of-Concept
 
@@ -56,7 +113,17 @@ Exposed reset function:
 /forgot-password?reset_token=${resetToken}
 ```
 
-### 2. At /forgot-password #, &, and =
+### 2. At /forgot-password
+1. #, &, and =
+2. 2 parameter tgt
+
+GET /users/search?name=peter&name=carlos&publicProfile=true
+
+    PHP parses the last parameter only. This would result in a user search for carlos.
+    ASP.NET combines both parameters. This would result in a user search for peter,carlos, which might result in an Invalid username error message.
+    Node.js / express parses the first parameter only. This would result in a user search for peter, giving an unchanged result.
+
+If you're able to override the original parameter, you may be able to conduct an exploit. For example, you could add name=administrator to the request. This may enable you to log in as the administrator user. 
 
 <img width="408" height="298" alt="image" src="https://github.com/user-attachments/assets/633ba1f3-f4da-4abc-bad5-9d618f0fa65b" />
 
