@@ -5,7 +5,7 @@ The application is vulnerable to **Mass Assignment** and **Server-Side Parameter
 # Proof-of-Concept
 
 ## (first find /api endpoint then try OPTION see allow what PATCH,GET,POST,PUT,HEAD?)
-
+or change get post patch delete /api/users/carlos
 Attacker can determine allowed HTTP methods via `OPTIONS`.
 
 ```
