@@ -23,6 +23,14 @@ How different servers parse the `name` parameter:
 | **Node.js / Express** | **First** parameter only | `peter` |
 | **ASP.NET** | **Combines** both with a comma | `peter,carlos` |
 
+Always blackslash code (SQLi, XSS, or JSON Injection) into a system that passes data through multiple servers, you almost always have to encode or escape your payload so it survives the first server without triggering an error or a WAF, allowing it to execute on the second server.
+Example.
+```http
+POST /update
+{"name": "peter\",\"role\":\"admin"}
+```
+
+
 ### 3. The Pro Play (How to Exploit)
 
 **Attack Path A: Privilege Escalation (Overriding Context)**
