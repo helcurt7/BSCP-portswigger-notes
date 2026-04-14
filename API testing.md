@@ -5,7 +5,7 @@ Got it. Here is the text and table rendered normally so you can read it straight
 ## 🔀 HTTP Parameter Pollution (HPP)
 *Requirement: The application processes multiple parameters with the same name unpredictably, allowing you to override values or bypass filters.*
 
-### 1. The Core URL Characters
+### 1. The Core URL Characters remember ###need to url encdoe first IMPORTANT!!!
 To manipulate parameters, you must control the delimiters:
 * **`&` (Ampersand):** Separates different parameters.
 * **`=` (Equals):** Assigns the value.
